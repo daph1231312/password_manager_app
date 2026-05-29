@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VaultKey — Password Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6ab0;
+    --green: #4fffb0;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --danger: #ff4d6d;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top: -40%;
+    left: -20%;
+    width: 60vw;
+    height: 60vw;
+    background: radial-gradient(circle, rgba(124,106,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── AUTH SCREEN ── */
+  #auth-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+  .auth-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 0 80px rgba(124,106,255,0.1);
+  }
+  .logo {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 0.25rem;
+  }
+  .logo span { color: var(--accent); }
+  .logo-sub { color: var(--muted); font-size: 0.85rem; font-family: 'Space Mono', monospace; margin-bottom: 2rem; }
+  .tab-switcher { display: flex; gap: 0.5rem; margin-bottom: 2rem; background: var(--bg); border-radius: 10px; padding: 4px; }
+  .tab-btn {
+    flex: 1; padding: 0.6rem; border: none; border-radius: 8px;
+    background: transparent; color: var(--muted); cursor: pointer;
+    font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+  .tab-btn.active { background: var(--accent); color: white; }
+
+  /* ── FORM ELEMENTS ── */
+  .field { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; letter-spacing: 0.05em; text-transform: uppercase; font-family: 'Space Mono', monospace; }
+  input, textarea, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.75rem 1rem; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 0.95rem; outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  .btn {
+    width: 100%; padding: 0.85rem; border: none; border-radius: 10px;
+    font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #9580ff; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(124,106,255,0.3); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: white; }
+  .btn-ghost { background: var(--surface2); color: var(--text); }
+  .btn-ghost:hover { background: var(--border); }
+  .btn-green { background: var(--green); color: #000; }
+  .btn-sm { width: auto; padding: 0.4rem 0.9rem; font-size: 0.82rem; border-radius: 8px; }
+  .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.75rem; text-align: center; font-family: 'Space Mono', monospace; }
+  .success-msg { color: var(--green); font-size: 0.85rem; margin-top: 0.75rem; text-align: center; font-family: 'Space Mono', monospace; }
+
+  /* ── MAIN APP ── */
+  #app-screen { display: none; min-height: 100vh; position: relative; z-index: 1; }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 2rem; border-bottom: 1px solid var(--border);
+    background: rgba(10,10,15,0.8); backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; }
+  .topbar-logo span { color: var(--accent); }
+  .user-pill {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50px; padding: 0.4rem 0.75rem 0.4rem 1rem;
+  }
+  .user-pill .name { font-size: 0.9rem; color: var(--muted); }
+  .logout-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 50px; padding: 0.35rem 0.9rem;
+    font-family: 'Syne', sans-serif; font-size: 0.82rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  .main-content { display: grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 65px); }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 1.5rem;
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .search-wrap { position: relative; }
+  .search-wrap input { padding-left: 2.5rem; }
+  .search-icon { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.9rem; }
+  .add-btn-wrap { }
+  .entry-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+  .entry-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.1rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .entry-card:hover, .entry-card.active { border-color: var(--accent); background: var(--surface2); }
+  .entry-card-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+  .entry-card-url { font-size: 0.78rem; color: var(--muted); font-family: 'Space Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty-state { color: var(--muted); text-align: center; padding: 3rem 1rem; font-size: 0.9rem; line-height: 1.8; }
+
+  /* ── MAIN PANEL ── */
+  .panel { padding: 2rem; }
+  .panel-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted); text-align: center;
+  }
+  .panel-placeholder-inner { max-width: 280px; }
+  .panel-placeholder-inner .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+  .panel-placeholder-inner p { font-size: 0.9rem; line-height: 1.8; }
+
+  /* ── ADD FORM ── */
+  .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+  .panel-title { font-size: 1.5rem; font-weight: 800; }
+  .pwd-input-wrap { position: relative; }
+  .pwd-input-wrap input { padding-right: 7rem; }
+  .pwd-actions { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); display: flex; gap: 0.4rem; }
+  .icon-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 7px; padding: 0.3rem 0.5rem; font-size: 0.75rem; cursor: pointer;
+    transition: all 0.15s; font-family: 'Space Mono', monospace;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .strength-bar { height: 4px; border-radius: 2px; margin-top: 0.5rem; background: var(--border); overflow: hidden; }
+  .strength-fill { height: 100%; border-radius: 2px; transition: all 0.3s; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* ── DETAIL VIEW ── */
+  .detail-header { margin-bottom: 2rem; }
+  .detail-title { font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem; }
+  .detail-url { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 0.85rem; }
+  .detail-field { margin-bottom: 1.5rem; }
+  .detail-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 0.5rem; }
+  .detail-value { font-size: 1rem; }
+  .pwd-reveal-row { display: flex; align-items: center; gap: 0.75rem; }
+  .pwd-dots { font-size: 1.5rem; letter-spacing: 3px; color: var(--muted); }
+  .pwd-revealed { font-family: 'Space Mono', monospace; font-size: 1rem; color: var(--green); }
+  .detail-actions { display: flex; gap: 0.75rem; margin-top: 2rem; flex-wrap: wrap; }
+
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(124,106,255,0.15); color: var(--accent); border-radius: 50px; padding: 0.3rem 0.8rem; font-size: 0.8rem; font-family: 'Space Mono', monospace; }
+
+  /* ── MODAL ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2rem; width: 100%; max-width: 460px; box-shadow: 0 0 60px rgba(124,106,255,0.15); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+  .modal-title { font-size: 1.3rem; font-weight: 800; }
+  .close-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 0.4rem 0.7rem; cursor: pointer; font-size: 1rem; }
+  .close-btn:hover { color: var(--text); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 2rem; right: 2rem; z-index: 999;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 0.9rem 1.4rem;
+    font-size: 0.9rem; font-family: 'Space Mono', monospace;
+    transform: translateY(10px); opacity: 0; transition: all 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.ok { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--danger); color: var(--danger); }
+
+  .hidden { display: none !important; }
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="logo">Vault<span>Key</span></div>
+    <div class="logo-sub">// encrypted password manager</div>
+    <div class="tab-switcher">
+      <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+      <button class="tab-btn" onclick="switchTab('register')">Register</button>
+    </div>
+    <div id="login-form">
+      <div class="field"><label>Username</label><input id="l-user" type="text" placeholder="your_username" autocomplete="username"></div>
+      <div class="field"><label>Master Password</label><input id="l-pass" type="password" placeholder="••••••••••••" autocomplete="current-password"></div>
+      <button class="btn btn-primary" onclick="doLogin()">Unlock Vault</button>
+      <div id="login-err" class="error-msg"></div>
+    </div>
+    <div id="register-form" class="hidden">
+      <div class="field"><label>Username</label><input id="r-user" type="text" placeholder="choose_username"></div>
+      <div class="field"><label>Master Password</label><input id="r-pass" type="password" placeholder="strong master password"></div>
+      <button class="btn btn-primary" onclick="doRegister()">Create Account</button>
+      <div id="reg-err" class="error-msg"></div>
+      <div id="reg-ok" class="success-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-logo">Vault<span>Key</span></div>
+    <div class="user-pill">
+      <span class="name" id="topbar-user"></span>
+      <button class="logout-btn" onclick="doLogout()">Logout & Lock</button>
+    </div>
+  </div>
+  <div class="main-content">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="search-input" placeholder="Search entries..." oninput="doSearch(this.value)">
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">+ Add Password</button>
+      <div class="entry-list" id="entry-list">
+        <div class="empty-state">No entries yet.<br>Add your first password →</div>
+      </div>
+    </div>
+    <!-- PANEL -->
+    <div class="panel" id="panel">
+      <div class="panel-placeholder">
+        <div class="panel-placeholder-inner">
+          <div class="icon">🔐</div>
+          <p>Select an entry to view details, or add a new password entry.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Password</div>
+      <button class="close-btn" onclick="closeModal('add-modal')">✕</button>
+    </div>
+    <div class="field"><label>Title *</label><input id="a-title" type="text" placeholder="e.g. Gmail, Netflix..."></div>
+    <div class="field">
+      <label>Password *</label>
+      <div class="pwd-input-wrap">
+        <input id="a-pwd" type="password" placeholder="Enter or generate..." oninput="updateStrength(this.value)">
+        <div class="pwd-actions">
+          <button class="icon-btn" onclick="toggleVis('a-pwd', this)">👁</button>
+          <button class="icon-btn" onclick="genPassword()">⚡Gen</button>
+        </div>
+      </div>
+      <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+    </div>
+    <div class="field"><label>URL / App Name</label><input id="a-url" type="text" placeholder="https://..."></div>
+    <div class="field"><label>Notes</label><textarea id="a-notes" placeholder="Optional notes..."></textarea></div>
+    <button class="btn btn-primary" onclick="doAddEntry()">Save Entry</button>
+    <div id="add-err" class="error-msg"></div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Entry</div>
+      <button class="close-btn" onclick="closeModal('edit-modal')">✕</button>
+    </div>
+    <div class="field"><label>New Password (leave blank to keep)</label>
+      <div class="pwd-input-wrap">
+        <input id="e-pwd" type="password" placeholder="New password...">
+        <div class="pwd-actions">
+          <button class="icon-btn" onclick="toggleVis('e-pwd', this)">👁</button>
+          <button class="icon-btn" onclick="genPasswordEdit()">⚡Gen</button>
+        </div>
+      </div>
+    </div>
+    <div class="field"><label>URL</label><input id="e-url" type="text"></div>
+    <div class="field"><label>Notes</label><textarea id="e-notes"></textarea></div>
+    <button class="btn btn-primary" onclick="doUpdateEntry()">Update Entry</button>
+    <div id="edit-err" class="error-msg"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentEntries = [];
+let activeTitle = null;
+
+// ── Auth ─────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0) === (tab==='login')));
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+}
+
+async function doLogin() {
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pass').value;
+  const res = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+  const data = await res.json();
+  if (!res.ok) { document.getElementById('login-err').textContent = data.error; return; }
+  document.getElementById('topbar-user').textContent = u;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  loadEntries();
+}
+
+async function doRegister() {
+  const u = document.getElementById('r-user').value.trim();
+  const p = document.getElementById('r-pass').value;
+  document.getElementById('reg-err').textContent = '';
+  document.getElementById('reg-ok').textContent = '';
+  const res = await fetch('/api/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+  const data = await res.json();
+  if (!res.ok) { document.getElementById('reg-err').textContent = data.error; return; }
+  document.getElementById('reg-ok').textContent = '✓ Account created! You can now log in.';
+}
+
+async function doLogout() {
+  await fetch('/api/logout', {method:'POST'});
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  currentEntries = [];
+  activeTitle = null;
+  toast('Vault locked & encrypted 🔒', 'ok');
+}
+
+// ── Entries ──────────────────────────────────────────
+async function loadEntries() {
+  const res = await fetch('/api/entries');
+  const data = await res.json();
+  currentEntries = data.entries || [];
+  renderList(currentEntries);
+}
+
+function renderList(entries) {
+  const el = document.getElementById('entry-list');
+  if (!entries.length) { el.innerHTML = '<div class="empty-state">No entries found.</div>'; return; }
+  el.innerHTML = entries.map(e => `
+    <div class="entry-card ${activeTitle===e.Title?'active':''}" onclick="selectEntry('${escHtml(e.Title)}')">
+      <div class="entry-card-title">${escHtml(e.Title)}</div>
+      <div class="entry-card-url">${escHtml(e.URL || '—')}</div>
+    </div>
+  `).join('');
+}
+
+async function selectEntry(title) {
+  activeTitle = title;
+  renderList(currentEntries);
+  const panel = document.getElementById('panel');
+  const entry = currentEntries.find(e => e.Title === title);
+  if (!entry) return;
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-title">${escHtml(entry.Title)}</div>
+      <div class="detail-url">${escHtml(entry.URL || 'No URL')}</div>
+    </div>
+    <div class="detail-field">
+      <div class="detail-label">Password</div>
+      <div class="pwd-reveal-row">
+        <span class="pwd-dots" id="pwd-display">••••••••••••</span>
+        <button class="btn btn-ghost btn-sm" onclick="revealPassword('${escHtml(title)}')">👁 Reveal</button>
+        <button class="btn btn-ghost btn-sm" id="copy-btn" onclick="copyPassword('${escHtml(title)}')">⧉ Copy</button>
+      </div>
+    </div>
+    <div class="detail-field">
+      <div class="detail-label">URL / App</div>
+      <div class="detail-value">${entry.URL ? `<a href="${escHtml(entry.URL)}" target="_blank" style="color:var(--accent)">${escHtml(entry.URL)}</a>` : '<span style="color:var(--muted)">—</span>'}</div>
+    </div>
+    <div class="detail-field">
+      <div class="detail-label">Notes</div>
+      <div class="detail-value" style="white-space:pre-wrap">${escHtml(entry.Notes || '—')}</div>
+    </div>
+    <div class="divider"></div>
+    <div class="detail-actions">
+      <button class="btn btn-ghost btn-sm" onclick="openEditModal('${escHtml(title)}')">✏️ Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="doDeleteEntry('${escHtml(title)}')">🗑 Delete</button>
+    </div>
+  `;
+}
+
+let revealedPasswords = {};
+
+async function revealPassword(title) {
+  if (revealedPasswords[title]) {
+    document.getElementById('pwd-display').className = 'pwd-dots';
+    document.getElementById('pwd-display').textContent = '••••••••••••';
+    delete revealedPasswords[title];
+    return;
+  }
+  const res = await fetch(`/api/entries/${encodeURIComponent(title)}`);
+  const data = await res.json();
+  if (data.entry) {
+    revealedPasswords[title] = data.entry.Password;
+    const el = document.getElementById('pwd-display');
+    el.className = 'pwd-revealed';
+    el.textContent = data.entry.Password;
+  }
+}
+
+async function copyPassword(title) {
+  let pwd;
+  if (revealedPasswords[title]) {
+    pwd = revealedPasswords[title];
+  } else {
+    const res = await fetch(`/api/entries/${encodeURIComponent(title)}`);
+    const data = await res.json();
+    pwd = data.entry?.Password;
+  }
+  if (pwd) {
+    await navigator.clipboard.writeText(pwd);
+    toast('Password copied! 📋', 'ok');
+  }
+}
+
+async function doSearch(q) {
+  if (!q.trim()) { renderList(currentEntries); return; }
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  const data = await res.json();
+  renderList(data.entries || []);
+}
+
+// ── Add ──────────────────────────────────────────────
+function openAddModal() {
+  ['a-title','a-pwd','a-url','a-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('add-err').textContent = '';
+  document.getElementById('strength-fill').style.width = '0';
+  document.getElementById('add-modal').classList.add('open');
+}
+
+async function doAddEntry() {
+  const title = document.getElementById('a-title').value.trim();
+  const password = document.getElementById('a-pwd').value;
+  const url = document.getElementById('a-url').value.trim();
+  const notes = document.getElementById('a-notes').value.trim();
+  document.getElementById('add-err').textContent = '';
+  const res = await fetch('/api/entries', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title, password, url, notes})});
+  const data = await res.json();
+  if (!res.ok) { document.getElementById('add-err').textContent = data.error; return; }
+  closeModal('add-modal');
+  toast('Entry saved & encrypted ✓', 'ok');
+  await loadEntries();
+  selectEntry(title);
+}
+
+// ── Edit ─────────────────────────────────────────────
+function openEditModal(title) {
+  const entry = currentEntries.find(e => e.Title === title);
+  document.getElementById('e-pwd').value = '';
+  document.getElementById('e-url').value = entry?.URL || '';
+  document.getElementById('e-notes').value = entry?.Notes || '';
+  document.getElementById('edit-err').textContent = '';
+  document.getElementById('edit-modal').dataset.title = title;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+async function doUpdateEntry() {
+  const title = document.getElementById('edit-modal').dataset.title;
+  const password = document.getElementById('e-pwd').value;
+  const url = document.getElementById('e-url').value;
+  const notes = document.getElementById('e-notes').value;
+  const body = {url, notes};
+  if (password) body.password = password;
+  const res = await fetch(`/api/entries/${encodeURIComponent(title)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if (!res.ok) { document.getElementById('edit-err').textContent = data.error; return; }
+  closeModal('edit-modal');
+  toast('Entry updated ✓', 'ok');
+  delete revealedPasswords[title];
+  await loadEntries();
+  selectEntry(title);
+}
+
+// ── Delete ───────────────────────────────────────────
+async function doDeleteEntry(title) {
+  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  const res = await fetch(`/api/entries/${encodeURIComponent(title)}`, {method:'DELETE'});
+  if (!res.ok) { toast('Error deleting entry', 'err'); return; }
+  activeTitle = null;
+  document.getElementById('panel').innerHTML = '<div class="panel-placeholder"><div class="panel-placeholder-inner"><div class="icon">🔐</div><p>Entry deleted.</p></div></div>';
+  toast('Entry deleted ✓', 'ok');
+  await loadEntries();
+}
+
+// ── Password Generator ───────────────────────────────
+async function genPassword() {
+  const res = await fetch('/api/generate-password?length=20');
+  const data = await res.json();
+  const input = document.getElementById('a-pwd');
+  input.value = data.password;
+  input.type = 'text';
+  updateStrength(data.password);
+  toast('Strong password generated ⚡', 'ok');
+}
+
+async function genPasswordEdit() {
+  const res = await fetch('/api/generate-password?length=20');
+  const data = await res.json();
+  const input = document.getElementById('e-pwd');
+  input.value = data.password;
+  input.type = 'text';
+}
+
+function updateStrength(pwd) {
+  const fill = document.getElementById('strength-fill');
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (pwd.length >= 14) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  const pct = (score / 5) * 100;
+  const colors = ['#ff4d6d','#ff9f43','#feca57','#48dbfb','#4fffb0'];
+  fill.style.width = pct + '%';
+  fill.style.background = colors[Math.min(score-1, 4)] || 'transparent';
+}
+
+// ── Utils ────────────────────────────────────────────
+function toggleVis(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  if (e.key === 'Enter' && document.getElementById('login-form').offsetParent) doLogin();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Never commit user data: it contains (encrypted) passwords and password hashes
+data/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
